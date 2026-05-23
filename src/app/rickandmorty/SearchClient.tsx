@@ -263,14 +263,6 @@ export default function SearchClient({ initialCharacters }: Props) {
           </div>
         </div>
       )}
-
-      {/* Pulse animation keyframes */}
-      <style jsx global>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
     </>
   )
 }

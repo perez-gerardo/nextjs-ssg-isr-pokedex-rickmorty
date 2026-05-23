@@ -34,24 +34,33 @@ async function getCharacter(id: string): Promise<Character> {
   throw new Error('Personaje no encontrado');
 }
 
-// SSG: Genera los parámetros estáticos para todos los personajes
+// SSG: Genera los parámetros estáticos para todos los personajes válidos
 export async function generateStaticParams() {
   const allIds: { id: string }[] = [];
 
-  // Obtener todas las páginas para generar todas las rutas estáticas
-  const firstRes = await fetch('https://rickandmortyapi.com/api/character');
-  const firstData: CharacterListResponse = await firstRes.json();
+  try {
+    const firstRes = await fetch('https://rickandmortyapi.com/api/character');
+    if (!firstRes.ok) return [];
+    const firstData: CharacterListResponse = await firstRes.json();
 
-  // Agregar IDs de la primera página
-  firstData.results.forEach(c => allIds.push({ id: c.id.toString() }));
+    firstData.results.forEach(c => allIds.push({ id: c.id.toString() }));
 
-  // Obtener las demás páginas
-  for (let i = 2; i <= firstData.info.pages; i++) {
-    const res = await fetch(`https://rickandmortyapi.com/api/character?page=${i}`);
-    if (res.ok) {
-      const data: CharacterListResponse = await res.json();
-      data.results.forEach(c => allIds.push({ id: c.id.toString() }));
+    // Obtener el resto de páginas en paralelo (máximo 42 páginas ~826 personajes)
+    const pagePromises = [];
+    for (let i = 2; i <= firstData.info.pages; i++) {
+      pagePromises.push(fetch(`https://rickandmortyapi.com/api/character?page=${i}`));
     }
+
+    const responses = await Promise.allSettled(pagePromises);
+    for (const result of responses) {
+      if (result.status === 'fulfilled' && result.value.ok) {
+        const data: CharacterListResponse = await result.value.json();
+        data.results.forEach(c => allIds.push({ id: c.id.toString() }));
+      }
+    }
+  } catch {
+    // Si falla, devolver un conjunto mínimo para no romper el build
+    return Array.from({ length: 20 }, (_, i) => ({ id: String(i + 1) }));
   }
 
   return allIds;
