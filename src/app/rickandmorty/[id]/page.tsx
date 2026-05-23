@@ -34,36 +34,21 @@ async function getCharacter(id: string): Promise<Character> {
   throw new Error('Personaje no encontrado');
 }
 
-// SSG: Genera los parámetros estáticos para todos los personajes válidos
+// dynamicParams = true permite que rutas no pre-generadas se creen bajo demanda (ISR)
+export const dynamicParams = true;
+
+// SSG: Pre-genera solo los primeros 20 personajes más populares en el build.
+// El resto se genera bajo demanda con ISR (revalidate: 864000).
 export async function generateStaticParams() {
-  const allIds: { id: string }[] = [];
-
   try {
-    const firstRes = await fetch('https://rickandmortyapi.com/api/character');
-    if (!firstRes.ok) return [];
-    const firstData: CharacterListResponse = await firstRes.json();
-
-    firstData.results.forEach(c => allIds.push({ id: c.id.toString() }));
-
-    // Obtener el resto de páginas en paralelo (máximo 42 páginas ~826 personajes)
-    const pagePromises = [];
-    for (let i = 2; i <= firstData.info.pages; i++) {
-      pagePromises.push(fetch(`https://rickandmortyapi.com/api/character?page=${i}`));
-    }
-
-    const responses = await Promise.allSettled(pagePromises);
-    for (const result of responses) {
-      if (result.status === 'fulfilled' && result.value.ok) {
-        const data: CharacterListResponse = await result.value.json();
-        data.results.forEach(c => allIds.push({ id: c.id.toString() }));
-      }
-    }
+    const res = await fetch('https://rickandmortyapi.com/api/character?page=1');
+    if (!res.ok) return [];
+    const data: CharacterListResponse = await res.json();
+    // Solo los primeros 20 para no colapsar el build
+    return data.results.slice(0, 20).map(c => ({ id: c.id.toString() }));
   } catch {
-    // Si falla, devolver un conjunto mínimo para no romper el build
     return Array.from({ length: 20 }, (_, i) => ({ id: String(i + 1) }));
   }
-
-  return allIds;
 }
 
 // Metadata dinámica para SEO
